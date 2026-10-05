@@ -295,7 +295,7 @@
 <div class="sheet" id="sheet" hidden>
   <div class="sheet-in">
     <h3>Your marks</h3>
-    <p class="field-hint" style="margin:0 0 13px;">The manual itself is built in and never changes. Your <em>marks and notes</em> are stored only on this device — export them now and then. Importing puts a backup back over the top, replacing what is here, and can be undone straight afterwards.</p>
+    <p class="field-hint" style="margin:0 0 13px;">The manual itself is built in and never changes. Your <em>marks and notes</em> are stored only on this device, so export them now and then. Importing puts a backup back over the top, replacing what is here, and can be undone straight afterwards.</p>
     <div class="btn-row">
       <button type="button" class="ghost" id="exportBtn">Export my marks</button>
       <button type="button" class="ghost" id="importBtn">Import marks</button>
@@ -343,7 +343,7 @@
   var marks  = readJSON(MARKS_KEY, []);  if (!Array.isArray(marks)) marks = [];
   var recent = readJSON(RECENT_KEY, []); if (!Array.isArray(recent)) recent = [];
 
-  function saveMarks(){ if(!safeSet(MARKS_KEY, JSON.stringify(marks))) toast('Couldn’t save — storage may be full or blocked.'); }
+  function saveMarks(){ if(!safeSet(MARKS_KEY, JSON.stringify(marks))) toast('Couldn’t save. Storage may be full or blocked.'); }
   function saveRecent(){ safeSet(RECENT_KEY, JSON.stringify(recent)); }
 
   function findMark(kind, ref){
@@ -460,15 +460,16 @@
   // ---------- find ----------
   function renderFind(parent){
     var head = el('<div><div class="eyebrow">Search</div>' +
-      '<h2 class="view-h">The whole manual</h2>' +
-      '<p class="view-sub">' + D.sections.length + ' sections, ' + D.glossary.length +
-      ' glossary terms and Riddell’s own index — all of it searchable, all of it offline.</p></div>');
+      '<h2 class="view-h">What are you looking for?</h2>' +
+      '<p class="view-sub">Type a word, a feeling, or whatever you are sitting with. ' +
+      'This looks through every page of the manual, the glossary and the index ' +
+      'all at once.</p></div>');
     parent.appendChild(head);
 
     var sw = el('<div class="search-wrap">' +
       '<span class="search-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></span>' +
       '<input class="search" id="q" type="search" autocomplete="off" ' +
-      'placeholder="A word, a feeling, a section number…" aria-label="Search the manual"></div>');
+      'placeholder="Search the manual…" aria-label="Search the manual"></div>');
     parent.appendChild(sw);
 
     var out = el('<div id="results"></div>');
@@ -631,26 +632,25 @@
     }
 
     if (!marks.length && !rec.length){
-      out.appendChild(el('<div class="card"><p class="card-h">Nothing marked yet</p>' +
-        '<p>Search above — every word of the manual is in here, including the ' +
-        'glossary and Riddell’s own index. Or browse <strong>Contents</strong> ' +
-        'to see the eight parts laid out.</p>' +
-        '<p>Mark anything you want to come back to and it will be waiting here.</p></div>'));
+      out.appendChild(el('<div class="card"><p class="card-h">Welcome</p>' +
+        '<p>Search above for whatever you are dealing with, or open ' +
+        '<strong>Contents</strong> to see how the manual is laid out.</p>' +
+        '<p>Anything you mark will be waiting here when you come back.</p></div>'));
     }
 
-    out.appendChild(el('<p class="colophon">' + esc(D.meta.title) + ' — ' + esc(D.meta.subtitle) +
+    out.appendChild(el('<p class="colophon">' + esc(D.meta.title) + '<br>' +
+      esc(D.meta.subtitle) + ' by ' + esc(D.meta.author) +
       '<br>' + esc(D.meta.copyright) + ' · ' + esc(D.meta.source) +
-      '<br>' + D.sections.length + ' sections, ' + D.glossary.length + ' glossary terms, ' +
-      D.index.length + ' index entries, ' + Object.keys(D.figures).length +
-      ' charts. Built in and readable offline.</p>'));
+      '<br>The whole manual is built into this app and works without a signal.</p>'));
   }
 
   // ---------- index view ----------
   function renderIndex(parent){
-    parent.appendChild(el('<div><div class="eyebrow">Riddell’s index</div>' +
+    parent.appendChild(el('<div><div class="eyebrow">Index</div>' +
       '<h2 class="view-h">Look a topic up</h2>' +
-      '<p class="view-sub">The manual’s own index — ' + D.index.length +
-      ' topics, each pointing at the section that deals with it. His judgement about where a thing is taught, not ours.</p></div>'));
+      '<p class="view-sub">Riddell’s own index. He decided where each topic is ' +
+      'properly dealt with, so this is usually the shortest way to the right ' +
+      'page.</p></div>'));
 
     var sw = el('<div class="search-wrap">' +
       '<span class="search-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></span>' +
@@ -690,8 +690,9 @@
   function renderTerms(parent){
     parent.appendChild(el('<div><div class="eyebrow">Glossary</div>' +
       '<h2 class="view-h">The words the system runs on</h2>' +
-      '<p class="view-sub">' + D.glossary.length + ' terms from §8.1. ' +
-      '“It takes new words to open up new worlds” — the manual’s own reason for having this.</p></div>'));
+      '<p class="view-sub">“It takes new words to open up new worlds.” If a word ' +
+      'is carrying more weight than it looks like, it is defined here, along ' +
+      'with the sections that use it.</p></div>'));
 
     var sw = el('<div class="search-wrap">' +
       '<span class="search-ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></span>' +
@@ -764,8 +765,10 @@
   // ---------- contents ----------
   function renderContents(parent){
     parent.appendChild(el('<div><div class="eyebrow">Contents</div>' +
-      '<h2 class="view-h">All ' + D.sections.length + ' sections</h2>' +
-      '<p class="view-sub">In the order they appear in the manual, grouped by its eight parts.</p></div>'));
+      '<h2 class="view-h">The manual, front to back</h2>' +
+      '<p class="view-sub">Every section in the order Riddell wrote it, under ' +
+      'the eight parts. Worth a browse when you are not sure what you are ' +
+      'looking for.</p></div>'));
     D.parts.forEach(function(p){
       var list = D.sections.filter(function(s){ return s.part === p.n; });
       if (!list.length) return;
@@ -793,6 +796,9 @@
         // What follows a real lead-in starts a new sentence, so it begins
         // with a capital (or a quote, bracket or footnote star). Without that
         // test "e.g." and "i.e." inside a question read as the end of one.
+        // NB the em dash in the class below is a MATCH TARGET against
+        // Riddell's own prose, not display copy. The app's own wording has no
+        // em dashes by choice; don't sweep this one away with them.
         var x = b.x, lead = '';
         var m = x.match(/^(.{3,95}?[.!])\s+(.+)$/);
         if (m && /^[A-Z“‘"'(*—]/.test(m[2])){
@@ -835,7 +841,7 @@
         // heuristic can leave the image permanently undecoded.
         parent.appendChild(el('<figure><img decoding="async" src="' + f.src +
           '" width="' + f.w + '" height="' + f.h + '" alt="' +
-          esc(s.title + ' — chart from page ' + f.page) + '">' +
+          esc(s.title + ', chart from page ' + f.page) + '">' +
           '<figcaption>From page ' + f.page + ' of the manual. Pinch to zoom.</figcaption></figure>'));
       });
     }
@@ -984,7 +990,7 @@
         var when = data.exported ? fmtDate(data.exported) : 'an unknown date';
         if (!confirm('Restore these marks?\n\n' + plural(inMarks.length,'mark') +
                      ', backed up ' + when + '.\n\n' +
-                     'This puts them back over the top — it replaces the marks and notes ' +
+                     'This puts them back over the top. It replaces the marks and notes ' +
                      'currently on this device. The manual itself is untouched either way.\n\n' +
                      'If it turns out to be the wrong file you can undo it straight afterwards.')){
           input.value = ''; return;
@@ -1011,7 +1017,7 @@
         var dropped = inMarks.length - marks.length;
         saveMarks(); saveRecent();
         refreshUndo(); $('sheet').hidden = true; setView('find');
-        toast('Restored — ' + plural(marks.length,'mark') +
+        toast('Restored ' + plural(marks.length,'mark') +
               (dropped > 0
                 ? ' (' + dropped + ' pointed at nothing and ' +
                   (dropped === 1 ? 'was' : 'were') + ' skipped)'
