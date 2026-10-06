@@ -1,5 +1,5 @@
 {
-  "id": "/Living-Wisdom-Manual/",
+  "id": "/Living-Wisdom-Manual/v2/",
   "name": "The Living Wisdom Manual",
   "short_name": "The Manual",
   "description": "David Riddell's Living Wisdom Manual, whole and searchable on your phone, with or without a signal.",
@@ -10,8 +10,7 @@
   "background_color": "#FBF6E0",
   "theme_color": "#00391F",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
