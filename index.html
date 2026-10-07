@@ -189,7 +189,7 @@
     margin:7px 0 6px; letter-spacing:-.012em; text-wrap:balance; font-weight:700; }
   .rd-sub{ font-family:var(--serif); font-style:italic; font-size:16px; color:var(--ink-soft); margin:0 0 14px; }
   .rd-rule{ height:1px; background:var(--line); margin:16px 0 18px; }
-  .reader-body{ font-family:var(--serif); font-size:16.5px; line-height:1.72; }
+  .reader-body{ font-family:var(--serif); font-size:calc(16.5px * var(--read-scale, 1)); line-height:1.72; }
   .reader-body p{ margin:0 0 15px; }
   .reader-body h4{
     font-family:var(--sans); font-size:12px; letter-spacing:.1em; text-transform:uppercase;
@@ -253,6 +253,12 @@
   .field-hint{ font-size:13.5px; color:var(--ink-soft); line-height:1.6; }
   .btn-row{ display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 0; }
   #importFile{ display:none; }
+  .sheet h3 + .field-hint + .btn-row{ margin-top:10px; }
+  .sheet-sec{ padding:0 0 18px; margin:0 0 18px; border-bottom:1px solid var(--line); }
+  .sheet-sec:last-child{ border-bottom:0; margin-bottom:0; padding-bottom:0; }
+  .size-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:12px 0 0; }
+  .size-row .sample{ font-family:var(--serif); color:var(--ink-soft); min-width:5.5em; text-align:center; font-size:13.5px; }
+  .resume{ display:block; width:100%; text-align:left; }
 
   .toast{
     position:fixed; left:50%; transform:translateX(-50%) translateY(14px);
@@ -301,8 +307,23 @@
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
 </button>
 
-<div class="sheet" id="sheet" hidden>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Settings and your marks" hidden>
   <div class="sheet-in">
+    <div class="sheet-sec">
+      <h3>Reading</h3>
+      <p class="field-hint" style="margin:0;">Make the text easier on your eyes. This only changes how pages look on this device.</p>
+      <div class="size-row">
+        <button type="button" class="ghost" id="sizeDown" aria-label="Smaller text">A&minus;</button>
+        <span class="sample" id="sizeLabel" aria-live="polite">Normal</span>
+        <button type="button" class="ghost" id="sizeUp" aria-label="Larger text">A+</button>
+      </div>
+    </div>
+    <div class="sheet-sec" id="installSec" hidden>
+      <h3>Keep it on your phone</h3>
+      <p class="field-hint" style="margin:0;" id="installHint">Install the manual so it opens like any other app, with no browser bars.</p>
+      <div class="btn-row"><button type="button" class="ghost" id="installBtn" hidden>Install the app</button></div>
+    </div>
+    <div class="sheet-sec">
     <h3>Your marks</h3>
     <p class="field-hint" style="margin:0 0 13px;">The manual itself is built in and never changes. Your <em>marks and notes</em> are stored only on this device, so export them now and then. Importing puts a backup back over the top, replacing what is here, and can be undone straight afterwards.</p>
     <div class="btn-row">
@@ -311,6 +332,8 @@
       <button type="button" class="ghost" id="undoBtn" hidden>Undo the last restore</button>
       <input type="file" id="importFile" accept="application/json">
       <button type="button" class="ghost" id="closeSheet">Close</button>
+    </div>
+    <p class="field-hint" id="backupStatus" style="margin:12px 0 0;"></p>
     </div>
   </div>
 </div>
@@ -328,6 +351,10 @@
   var RECENT_KEY = 'lwmanual:recent';
   var THEME_KEY  = 'lwmanual:theme';
   var UNDO_KEY   = 'lwmanual:preimport';
+  var SIZE_KEY   = 'lwmanual:size';
+  var POS_KEY    = 'lwmanual:pos';
+  var BACKUP_KEY = 'lwmanual:lastbackup';
+  var NUDGE_KEY  = 'lwmanual:nudged';
 
   // ---------- indexes ----------
   var byId = {}, partTitle = {}, termByKey = {}, figsBySec = {};
@@ -432,7 +459,7 @@
     stack = [{ kind:'view', name:name }]; cur = stack[0];
     paint(true); window.scrollTo(0,0);
   }
-  function openSection(id, q){ go({ kind:'section', id:id, q:q||'' }); }
+  function openSection(id, q, resume){ go({ kind:'section', id:id, q:q||'', resume:!!resume }); }
 
   function pulse(btn){
     btn.classList.remove('halo');
@@ -473,14 +500,14 @@
     parent.appendChild(b);
   }
 
-  function sectionRow(s, extraHTML, q){
+  function sectionRow(s, extraHTML, q, resume){
     var r = el('<button class="row" type="button">' +
       '<span class="row-ref">' + esc(s.id) + '</span>' +
       '<span class="row-main"><span class="row-t">' + esc(s.title) + '</span>' +
       (extraHTML || '') + '</span>' +
       (findMark('section', s.id) ? '<span class="star">★</span>' : '') +
       '</button>');
-    r.addEventListener('click', function(){ openSection(s.id, q); });
+    r.addEventListener('click', function(){ openSection(s.id, q, resume); });
     return r;
   }
 
@@ -499,7 +526,7 @@
       'placeholder="Search the manual…" aria-label="Search the manual"></div>');
     parent.appendChild(sw);
 
-    var out = el('<div id="results"></div>');
+    var out = el('<div id="results" aria-live="polite"></div>');
     parent.appendChild(out);
 
     var input = sw.querySelector('#q');
@@ -641,6 +668,15 @@
         rs.appendChild(r);
       });
       out.appendChild(g);
+    }
+
+    var last = recent.filter(function(r){ return r.kind==='section' && byId[r.ref]; })[0];
+    if (last && positions[last.ref] > 300){
+      var ls = byId[last.ref];
+      var cont = el('<div class="grp"><div class="grp-h">Pick up where you left off</div><div class="rows"></div></div>');
+      var cr = sectionRow(ls, '<span class="row-m">' + esc(partLabel(ls)) + '</span>', '', true);
+      cont.querySelector('.rows').appendChild(cr);
+      out.insertBefore(cont, out.firstChild);
     }
 
     var rec = recent.filter(function(r){ return r.kind==='term' ? termByKey[r.ref] : byId[r.ref]; });
@@ -861,6 +897,10 @@
     parent.appendChild(el('<div class="rd-rule"></div>'));
 
     var figs = figsBySec[id] || [];
+    if (cur.resume && positions[id] > 0){
+      var y = positions[id];
+      setTimeout(function(){ window.scrollTo(0, y); }, 80);
+    }
     if (s.blocks.length){
       var body = el('<div class="reader-body">' + renderBlocks(s.blocks) + '</div>');
       parent.appendChild(body);
@@ -982,15 +1022,35 @@
   $('exportBtn').addEventListener('click', function(){
     var data = { app:'lw-manual', version:1, exported:new Date().toISOString(),
                  marks:marks, recent:recent };
-    var blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
+    var json = JSON.stringify(data, null, 2);
     var d = new Date(), pad = function(n){ return n<10?'0'+n:''+n; };
-    a.href = url;
-    a.download = 'living-wisdom-marks-' + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + '.json';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    toast(plural(marks.length,'mark') + ' saved to your downloads.');
+    var fname = 'living-wisdom-marks-' + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + '.json';
+    function done(msg){
+      safeSet(BACKUP_KEY, new Date().toISOString());
+      refreshBackupStatus(); toast(msg);
+    }
+    function download(){
+      var blob = new Blob([json], { type:'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      done(plural(marks.length,'mark') + ' saved to your downloads.');
+    }
+    // On a phone the share sheet puts the file straight into Files, Drive or
+    // an email, which is where a backup is actually safe. Anywhere it is
+    // missing or refused, fall back to a plain download.
+    try{
+      var file = new File([json], fname, { type:'application/json' });
+      if (navigator.canShare && navigator.canShare({ files:[file] })){
+        navigator.share({ files:[file], title:'My Living Wisdom marks' })
+          .then(function(){ done(plural(marks.length,'mark') + ' backed up.'); })
+          .catch(function(err){ if (err && err.name !== 'AbortError') download(); });
+        return;
+      }
+    } catch(e){}
+    download();
   });
 
   $('importBtn').addEventListener('click', function(){ $('importFile').click(); });
@@ -1070,9 +1130,107 @@
   toTop.addEventListener('click', function(){ window.scrollTo({ top:0, behavior:'smooth' }); });
 
   refreshUndo();
-  setView('find');
+
+  // ---------- reading size ----------
+  var SIZES = [0.9, 1, 1.15, 1.3, 1.5], SIZE_NAMES = ['Small', 'Normal', 'Large', 'Larger', 'Largest'];
+  var sizeIx = parseInt(safeGet(SIZE_KEY), 10);
+  if (!(sizeIx >= 0 && sizeIx < SIZES.length)) sizeIx = 1;
+  function applySize(){
+    document.documentElement.style.setProperty('--read-scale', SIZES[sizeIx]);
+    $('sizeLabel').textContent = SIZE_NAMES[sizeIx];
+    $('sizeDown').disabled = sizeIx === 0;
+    $('sizeUp').disabled = sizeIx === SIZES.length - 1;
+  }
+  function stepSize(d){
+    sizeIx = Math.max(0, Math.min(SIZES.length - 1, sizeIx + d));
+    safeSet(SIZE_KEY, String(sizeIx)); applySize();
+  }
+  $('sizeDown').addEventListener('click', function(){ stepSize(-1); });
+  $('sizeUp').addEventListener('click', function(){ stepSize(1); });
+  applySize();
+
+  // ---------- backup status and nudge ----------
+  function refreshBackupStatus(){
+    var iso = safeGet(BACKUP_KEY), n = $('backupStatus');
+    if (!marks.length && !iso){ n.textContent = ''; return; }
+    n.textContent = iso
+      ? 'Last backed up ' + fmtDate(iso) + '.'
+      : 'Not backed up yet. If this phone is lost or its browser data is cleared, your marks go with it.';
+  }
+  refreshBackupStatus();
+  $('moreBtn').addEventListener('click', refreshBackupStatus);
+
+  // Remind, at most once a week, when marks exist that have never been (or
+  // not lately been) saved anywhere but this device.
+  (function(){
+    if (!marks.length) return;
+    var last = Date.parse(safeGet(BACKUP_KEY) || ''), nudged = Date.parse(safeGet(NUDGE_KEY) || '');
+    var DAY = 864e5, now = Date.now();
+    if (!isNaN(last) && now - last < 30 * DAY) return;
+    if (!isNaN(nudged) && now - nudged < 7 * DAY) return;
+    setTimeout(function(){
+      safeSet(NUDGE_KEY, new Date().toISOString());
+      toast('Your ' + plural(marks.length,'mark') + ' live only on this phone. Tap the dots to back them up.');
+    }, 3500);
+  })();
+
+  // Ask the browser not to clear marks and notes when it is short of space.
+  try{ if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+
+  // ---------- reading position ----------
+  var positions = readJSON(POS_KEY, {});
+  if (!positions || typeof positions !== 'object' || Array.isArray(positions)) positions = {};
+  var posTimer;
+  window.addEventListener('scroll', function(){
+    if (!cur || cur.kind !== 'section') return;
+    clearTimeout(posTimer);
+    var id = cur.id, y = Math.round(window.scrollY);
+    posTimer = setTimeout(function(){
+      positions[id] = y;
+      var keep = {};
+      recent.forEach(function(r){ if (r.kind === 'section' && positions[r.ref] != null) keep[r.ref] = positions[r.ref]; });
+      keep[id] = y; positions = keep;
+      safeSet(POS_KEY, JSON.stringify(positions));
+    }, 400);
+  }, { passive:true });
+
+  // ---------- install ----------
+  var installEvt = null;
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!standalone){
+    if (isIOS){
+      $('installSec').hidden = false;
+      $('installHint').textContent = 'To keep the manual on your home screen, tap the Share button in Safari, then “Add to Home Screen”.';
+    }
+    window.addEventListener('beforeinstallprompt', function(e){
+      e.preventDefault(); installEvt = e;
+      $('installSec').hidden = false; $('installBtn').hidden = false;
+    });
+    $('installBtn').addEventListener('click', function(){
+      if (!installEvt) return;
+      installEvt.prompt();
+      installEvt.userChoice.then(function(){ installEvt = null; $('installSec').hidden = true; });
+    });
+  }
+  window.addEventListener('appinstalled', function(){ $('installSec').hidden = true; toast('Installed.'); });
+
+  // Home-screen shortcuts open ./?view=find, contents or terms.
+  var startView = 'find';
+  try{
+    var qv = new URLSearchParams(location.search).get('view');
+    if (qv === 'index' || qv === 'terms' || qv === 'contents' || qv === 'find') startView = qv;
+  }catch(e){}
+  setView(startView);
 
   if ('serviceWorker' in navigator){
+    var hadController = !!navigator.serviceWorker.controller, notified = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function(){
+      if (notified) return; notified = true;
+      toast(hadController ? 'Updated. Close and reopen the manual to see the latest.'
+                          : 'Ready. The whole manual now works without a signal.');
+    });
     window.addEventListener('load', function(){
       navigator.serviceWorker.register('sw.js').catch(function(){});
     });
