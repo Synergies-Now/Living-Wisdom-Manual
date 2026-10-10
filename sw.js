@@ -1,4 +1,4 @@
-const CACHE_NAME   = 'lw-manual-v3';
+const CACHE_NAME   = 'lw-manual-83c55960d0';
 const CACHE_PREFIX = 'lw-manual-';        // CACHE_NAME minus the version
 
 const ASSETS = [
